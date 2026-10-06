@@ -1,0 +1,15 @@
+[package]
+name = "mirrorcam"
+version = "0.1.0"
+edition = "2021"
+description = "Minimal borderless camera overlay with autohide panels (GTK4 + libadwaita)"
+license = "MIT"
+
+[dependencies]
+gtk4 = { version = "0.11", features = ["v4_10"] }
+libadwaita = { version = "0.9", features = ["v1_4"] }
+gstreamer = "0.25"
+glib = "0.22"
+
+[profile.dev]
+debug = 1
