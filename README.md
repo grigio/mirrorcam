@@ -7,22 +7,39 @@ with auto-hiding panels and a camera/resolution selector.
 
 ## Features
 
-* **Borderless overlay** — no title bar, black letterboxed canvas.
-* **Always on top** — uses `gtk4-layer-shell` when the compositor supports it
-  (detected at build time by `build.rs`; without the library the app still
-  builds and runs as a plain undecorated window).
-* **Adwaita header, auto-hiding** — one header bar at the top edge holds every
-  control (app title on the left, selectors and buttons on the right), with the
-  `Camera · WxH · N fps` status line as a pill just below it. Move the pointer
+* **Borderless overlay** — no title bar, black letterboxed canvas with
+  **rounded corners** (the toplevel is transparent, the canvas paints the
+  12 px radius, so the backdrop shows through the four corners).
+* **A normal window** — no layer shell, just a regular undecorated
+  `xdg_toplevel`: clicking it raises it above everything else (no pinning
+  needed), it takes keyboard focus, and it shows up in the compositor's
+  window switcher (`Alt+Tab`) like any other application.
+* **Adwaita header, auto-hiding** — one `AdwHeaderBar` sits flush with the top
+  edge (rounded bottom corners) and carries every control: the selectors on
+  the left, the app title in the middle, mirror, the hamburger and the
+  **close ✕ at the far right**. Only the ✕ is shown — no minimise / maximise,
+  they make no sense for an overlay — and it sits on the end side, never on
+  the left; quitting also works from the hamburger menu, on `q` and on
+  `Ctrl+Q`. Move the pointer
   into the window to reveal it, it fades out after ~1.6 s of idleness;
   hovering the header or an open menu keeps it up, leaving the window hides it
   immediately.
+* **Resize from the edges** — invisible 14 px grips on the right, bottom and
+  bottom-right corner; dragging one resizes the window 1:1 with the pointer
+  (minimum 240×160), without fighting the drag-to-move gesture.
 * **Hamburger menu** — `☰` (instead of an info button) opens the primary menu
-  with *About MirrorCam* and *Quit*, as ordinary application actions.
-* **Toasts at the bottom** — errors are reported with an `AdwToast` at the
-  bottom of the window (the header never turns into an error banner).
-* **Drag to move** — on a layer surface the window is moved through its
-  margins, so it can be repositioned anywhere on the screen.
+  with *About MirrorCam* and *Quit*, as ordinary application actions; the
+  About dialog is a normal transient window the compositor stacks **centred
+  over the app**, not in a corner of the desktop.
+* **Toasts at the bottom** — `AdwToast` at the bottom of the window is the
+  only message channel: errors appear there, and so does the camera info
+  (`XiaoMi WebCam (V4L2) · 1920x1080 · 30 fps`) — *only* when the camera or
+  resolution changes, then it fades away. The header has no permanent status
+  line, so it always fits.
+* **Drag to move** — dragging the video (or the header bar) sends one
+  `xdg_toplevel.move`, so the compositor drags the window 1:1, keeps it on
+  screen and raises it. A 4 px threshold tells a real drag apart from a
+  click, so clicking the video still just focuses the window.
 * **Camera selector** — appears only when the machine has more than one
   camera; cameras are hot-plug aware (`GstDeviceMonitor`), and unplugging the
   active camera is handled without crashing. The header gives the title up
@@ -31,9 +48,9 @@ with auto-hiding panels and a camera/resolution selector.
 * **Resolution selector** — lists every size the selected camera offers, with
   the best frame rate for each (`1920x1080 · 30 fps`, `640x480 · 30 fps`, …);
   the button shows just the size, the menu keeps the fps.
-* **Live status** — `Camera · WxH · N fps`, measured from the frames that
-  actually reach the sink (pad probe), refreshed once a second.
-* **Mirror** (selfie flip) and **pin** (always on top) toggles in the header.
+* **Live camera info** — the toast text is measured from the frames that
+  actually reach the sink (pad probe on the sink), so the fps is real.
+* **Mirror** (selfie flip) toggle in the header.
 
 ### The 30 fps fix
 
@@ -48,12 +65,9 @@ present but expose no JPEG decoder), so software decode is the fast path here.
 ## Build
 
 ```sh
-# deps: gtk4, libadwaita, gstreamer (base/good/gtk4 plugins), optionally gtk4-layer-shell
+# deps: gtk4, libadwaita, gstreamer (base/good/gtk4 plugins)
 cargo build --release
 ```
-
-`build.rs` probes `pkg-config --exists gtk4-layer-shell-0` and enables the
-`has_layer_shell` cfg accordingly.
 
 ## Run
 
@@ -64,12 +78,15 @@ cargo build --release
 | input | action |
 |---|---|
 | move pointer into window | reveal the header |
+| click on the window | raise it to the foreground and focus it |
+| `Alt+Tab` | MirrorCam is a regular window, it is in the switcher |
 | `m` | toggle mirror |
-| `p` | toggle always-on-top (layer shell) |
 | `q` / `Esc` / `Ctrl+Q` | quit |
-| `☰` → *About MirrorCam* | about dialog |
+| `☰` → *About MirrorCam* | about dialog, centred over the window |
 | `☰` → *Quit* | quit |
-| drag anywhere on the video | move the window |
+| ✕ (right end of the header) | close the window and quit |
+| drag the header bar or the video | move the window |
+| drag the right / bottom edge or the corner | resize the window |
 
 ## Testing
 
@@ -90,9 +107,7 @@ $VW input mousemove -a -x 390 -y 300
 
 | file | role |
 |---|---|
-| `src/main.rs` | UI, panels, autohide, shortcuts, selectors, status |
+| `src/main.rs` | UI, panels, autohide, shortcuts, selectors, move/resize |
 | `src/camera.rs` | device discovery, hotplug, format list, GStreamer pipeline |
-| `src/layer_shell.rs` | thin `gtk4-layer-shell` wrapper |
-| `build.rs` | detects `gtk4-layer-shell` at build time |
 
 MIT licensed.

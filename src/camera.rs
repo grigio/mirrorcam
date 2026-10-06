@@ -12,12 +12,12 @@
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use std::time::Instant;
 
-use gstreamer as gst;
 use gst::prelude::*;
+use gstreamer as gst;
 
 /// One resolution a camera can deliver, with the best frame rate it offers.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -63,7 +63,8 @@ impl Camera {
         let source = device.create_element(None).map_err(err)?;
 
         // MJPEG only when the size really is offered as MJPEG and a decoder exists
-        let mjpeg = format.is_some_and(|f| f.mjpeg) && gst::ElementFactory::find("jpegdec").is_some();
+        let mjpeg =
+            format.is_some_and(|f| f.mjpeg) && gst::ElementFactory::find("jpegdec").is_some();
         let caps = match format {
             Some(f) if mjpeg => gst::Caps::builder("image/jpeg")
                 .field("width", f.width)
@@ -84,8 +85,12 @@ impl Camera {
             .property("caps", caps)
             .build()
             .map_err(err)?;
-        let convert = gst::ElementFactory::make("videoconvert").build().map_err(err)?;
-        let sink = gst::ElementFactory::make("gtk4paintablesink").build().map_err(err)?;
+        let convert = gst::ElementFactory::make("videoconvert")
+            .build()
+            .map_err(err)?;
+        let sink = gst::ElementFactory::make("gtk4paintablesink")
+            .build()
+            .map_err(err)?;
 
         let pipeline = gst::Pipeline::new();
         let decoder = if mjpeg {
@@ -198,7 +203,10 @@ impl Devices {
     /// appears or disappears. `None` when the monitor cannot be started.
     pub fn watch(on_change: impl Fn() + 'static) -> Option<Self> {
         let monitor = gst::DeviceMonitor::new();
-        monitor.add_filter(Some("Video/Source"), Some(&gst::Caps::builder("video/x-raw").build()));
+        monitor.add_filter(
+            Some("Video/Source"),
+            Some(&gst::Caps::builder("video/x-raw").build()),
+        );
         monitor.start().ok()?;
         // `start()` re-announces the cameras the monitor already knows about;
         // remember them so that the caller's initial refresh is not repeated
