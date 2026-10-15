@@ -52,7 +52,8 @@
   and `gtk4paintablesink`, so the pipeline needs no extra flatpak modules.
 - Local verify (GNOME 50 + rust-stable 25.08 installed):
   `flatpak-builder --user --install --force-clean build-dir io.github.grigio.mirrorcam.yml`
-  then, in a Wayland session,
+  then run it in a **nested Wayland session** (see "GUI development"
+  below — the Flatpak runs there fine and still sees the camera):
   `timeout 8 flatpak run io.github.grigio.mirrorcam` — must print the
   camera line and have an **empty stderr** (a panic or a missing plugin
   shows up there; exit 124 is just the timeout).
@@ -98,11 +99,65 @@ failures and a red job blocks the release.
   way — camera handles stay on the main context; the GStreamer bus watch
   is `add_watch_local` (main loop), never a thread.
 
-## GUI automation (this machine)
+## GUI development (nested Wayland session — preferred)
 
-- The nested-session flow in the README (`virtual-wayland` skill) works
-  for the native binary. The Flatpak cannot run inside it (different
-  sandbox), test that one on the real session with a `timeout` and a
-  `pkill -x mirrorcam` afterwards.
+Develop and test MirrorCam **inside a nested compositor** via the
+`virtual-wayland` skill, never on the real desktop. It starts a second
+`labwc` whose pointer/keyboard exist only inside it
+(`zwlr_virtual_pointer_v1` / `zwp_virtual_keyboard_v1`), so screenshots
+and input injection never touch the user's session: `/dev/uinput` is
+never opened and `ydotoold` is never used.
+
+```sh
+VW=~/.pi/agent/skills/virtual-wayland/scripts/vw
+pkill -x mirrorcam                 # host side; always -x, never -f (see below)
+$VW start --headless --size 960x640   # or omit --headless to watch it
+eval $($VW env)                    # export WAYLAND_DISPLAY=wayland-N
+
+cargo build && $VW run ./target/debug/mirrorcam   # native binary
+# or the Flatpak — it works here too (verified):
+$VW run flatpak run io.github.grigio.mirrorcam
+
+$VW input mousemove -a -x 120 -y 30   # hover the window -> reveals the header
+$VW shot /tmp/a.png                   # screenshot of the NESTED output
+$VW input click 0xC0                  # left click (0x40 down / 0x80 up)
+$VW input key 109:1 109:0            # raw evdev keycode (End here)
+$VW stop
+```
+
+Verified on this machine:
+
+- **The Flatpak runs inside the nested session and still sees the
+  camera.** `--device=all` grants `/dev/video*` independently of which
+  compositor is underneath, so the sandboxed build enumerates the XiaoMi
+  webcam exactly like the native one (`mirrorcam: found camera XiaoMi
+  WebCam (V4L2) (/dev/video0)`). No real desktop session is needed for
+  either build.
+- **Screenshot pixels == `vw input -a` coordinates, 1:1 at any scale**
+  (`vw shot` pins grim to the output scale and `-a` sends mode-size
+  extents). Never divide by the scale. The default session is 960×640 @
+  scale 0.5, so apps render on a 1920×1280 logical desktop.
+- The window maps at its default `WIDTH`×`HEIGHT` (480×320) at 0,0; the
+  header is hidden until the pointer enters the window (`mousemove -a`
+  into it), and the live camera frames appear immediately — a **blank
+  screenshot means the pipeline failed**, check the client log.
+- App stdout/stderr is a normal file: `$VW logs` for the compositor,
+  `/tmp/virtual-wayland/client-N.log` for the app. `pgrep -cx mirrorcam`
+  works unchanged. Exit code 124 under `timeout` is normal, not a crash.
+
+Use `--headless` for unattended runs (screenshots return instantly); the
+windowed mode only renders while its window is visible, so an occluded
+nested window makes `vw shot` time out.
+
+## GUI automation on the real session (last resort)
+
+- Only for things the nested session cannot reach — and for MirrorCam
+  that is nothing: the Flatpak needs no host session (see above). When
+  you must use the real session, keep it to a `timeout 8 flatpak run …`
+  smoke test followed by `pkill -x mirrorcam`, and never leave a window
+  or a camera stream running unattended.
 - `pkill -f <path/pattern>` also matches your own shell's command line —
   use `pkill -x mirrorcam`.
+- Never reach for `ydotool`/`xdotool`/`wtype` in a flow meant for the
+  nested session: those move the user's real pointer and keys. `vw input`
+  is the only injector that belongs here.

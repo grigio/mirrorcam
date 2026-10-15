@@ -110,18 +110,26 @@ flatpak-builder --user --install --force-clean build-dir io.github.grigio.mirror
 
 ## Testing
 
-GUI behaviour was verified in a nested, isolated Wayland session with the
-[virtual-wayland](https://github.com/) skill (screenshots + pixel diffs, virtual
-pointer only — the real desktop is never touched):
+GUI behaviour is verified in a nested, isolated Wayland session with the
+[virtual-wayland](https://github.com/grigio/virtual-wayland) skill
+(screenshots + injected input via virtual pointer/keyboard only — the
+real desktop is never touched, `/dev/uinput` is never opened):
 
 ```sh
 VW=~/.pi/agent/skills/virtual-wayland/scripts/vw
-$VW start --headless
+$VW start --headless --size 960x640
 eval $($VW env)
-$VW run ./target/debug/mirrorcam
-$VW shot /tmp/a.png
-$VW input mousemove -a -x 390 -y 300
+
+$VW run ./target/debug/mirrorcam        # native binary
+$VW run flatpak run io.github.grigio.mirrorcam   # or the Flatpak — camera works here too
+
+$VW input mousemove -a -x 120 -y 30     # hover: reveals the autohide header
+$VW shot /tmp/a.png                     # screenshot px == -a coordinates, 1:1
+$VW stop
 ```
+
+A blank screenshot means the GStreamer pipeline failed — the app's
+stdout/stderr is in `/tmp/virtual-wayland/client-N.log`.
 
 ## Layout
 
