@@ -19,7 +19,7 @@ use gtk4::gdk;
 use gtk4::glib;
 use libadwaita as adw;
 
-const APP_ID: &str = "org.mirrorcam.Camera";
+const APP_ID: &str = "io.github.grigio.mirrorcam";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const WIDTH: i32 = 480;
 const HEIGHT: i32 = 320;
@@ -827,9 +827,10 @@ fn show_about(app: &Shared) {
     let about = adw::AboutWindow::builder()
         .application_name("MirrorCam")
         .version(VERSION)
+        .icon_name(APP_ID)
         .developers(developers)
         .comments("A minimal, borderless camera overlay with auto-hiding panels.")
-        .website("https://github.com/grigio/borderless-camera")
+        .website("https://github.com/grigio/mirrorcam")
         .license_type(gtk::License::MitX11)
         .build();
     // a normal transient window: the compositor stacks it over MirrorCam

@@ -1,0 +1,45 @@
+app-id: io.github.grigio.mirrorcam
+runtime: org.gnome.Platform
+runtime-version: '50'
+branch: stable
+sdk: org.gnome.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: mirrorcam
+
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+  env:
+    # Kept outside the module dir (same trick as Carosello): cargo's own
+    # cache never lands in the read-only source tree.
+    CARGO_HOME: /run/build-mirrorcam/cargo
+
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  # Cameras: /dev/video* (v4l2 provider of GstDeviceMonitor)
+  - --device=all
+  # PipeWire provider of GstDeviceMonitor (some laptops expose the webcam
+  # through PipeWire rather than raw v4l2)
+  - --filesystem=xdg-run/pipewire-0
+
+modules:
+  - name: mirrorcam
+    buildsystem: simple
+    build-commands:
+      - cargo --offline --frozen build --release
+      - install -Dm755 target/release/mirrorcam /app/bin/mirrorcam
+      - install -Dm644 data/io.github.grigio.mirrorcam.desktop
+        /app/share/applications/io.github.grigio.mirrorcam.desktop
+      - install -Dm644 data/io.github.grigio.mirrorcam.metainfo.xml
+        /app/share/metainfo/io.github.grigio.mirrorcam.metainfo.xml
+      - install -Dm644 data/icons/hicolor/scalable/apps/io.github.grigio.mirrorcam.svg
+        /app/share/icons/hicolor/scalable/apps/io.github.grigio.mirrorcam.svg
+    sources:
+      - type: dir
+        path: .
+      # Generated from Cargo.lock by the CI "flatpak" job (and by
+      # build-aux/gen-cargo-sources.py locally). Gitignored, like Carosello's.
+      - cargo-sources.json

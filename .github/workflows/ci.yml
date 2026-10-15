@@ -1,0 +1,162 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+    tags:
+      - 'v*'
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  versions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check version sync (Cargo.toml is the source of truth)
+        run: |
+          CARGO=$(grep '^version =' Cargo.toml | cut -d'"' -f2)
+          META=$(grep -oP '<release version="\K[0-9.]+' data/*.metainfo.xml | head -1)
+          [ "$CARGO" = "$META" ] || { echo "metainfo $META != cargo $CARGO"; exit 1; }
+          echo "versions in sync: $CARGO"
+
+      - name: Check tag matches Cargo.toml
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          CARGO=$(grep '^version =' Cargo.toml | cut -d'"' -f2)
+          [ "${{ github.ref_name }}" = "v$CARGO" ] || { echo "tag ${{ github.ref_name }} != v$CARGO"; exit 1; }
+
+  build:
+    runs-on: ubuntu-latest
+    # NOT the bare runner image: keep this in sync with the features selected
+    # in Cargo.toml (gtk4 "v4_10", libadwaita "v1_4"). The 26.04 container
+    # ships a new enough GTK4/libadwaita/GStreamer, runs as root (no sudo)
+    # and has no toolchain preinstalled.
+    container: ubuntu:26.04
+    steps:
+      - uses: actions/checkout@v5
+
+      # Root inside the container: no sudo, and no toolchain preinstalled.
+      - name: Install dependencies
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            build-essential \
+            pkg-config \
+            curl \
+            git \
+            ca-certificates \
+            libgtk-4-dev \
+            libadwaita-1-dev \
+            libgstreamer1.0-dev \
+            libgstreamer-plugins-base1.0-dev \
+            gstreamer1.0-plugins-base \
+            gstreamer1.0-plugins-good \
+            gstreamer1.0-gtk4 \
+            gettext
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Run tests
+        run: cargo test
+
+      - name: Upload binary
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v7
+        with:
+          name: mirrorcam-linux-x86_64
+          path: target/release/mirrorcam
+
+  flatpak:
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-50
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Generate Cargo sources for Flatpak
+        run: python3 build-aux/gen-cargo-sources.py
+
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          manifest-path: io.github.grigio.mirrorcam.yml
+          bundle: mirrorcam.flatpak
+          artifact-name: mirrorcam-${{ github.ref_name }}-x86_64.flatpak
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [build, flatpak]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # Full history + tags: the release body lists the commits since the
+      # previous v* tag (fetch-depth must not be the default shallow clone).
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Build release notes (titles since the previous tag)
+        run: |
+          TAG="${{ github.ref_name }}"
+          # Version-sorted, newest first, minus the tag being released.
+          # `|| true`: with a single tag the grep filter matches nothing.
+          PREV=$(git tag --list 'v*' --sort=-v:refname | grep -Fxv "$TAG" | head -n1 || true)
+          if [ -n "$PREV" ]; then
+            RANGE="$PREV..$TAG"
+            HEADER="Changes since $PREV:"
+          else
+            RANGE="$TAG"          # first release: every commit up to the tag
+            HEADER="Changes in $TAG:"
+          fi
+          {
+            echo "$HEADER"
+            # Empty range (an older tag pushed after a newer one exists)
+            # would otherwise produce a body with only the header.
+            COMMITS=$(git log --format='- %s' "$RANGE" || true)
+            [ -n "$COMMITS" ] || COMMITS=$(git show -s --format='- %s' "$TAG")
+            echo "$COMMITS"
+          } > RELEASE_NOTES.md
+          echo "--- RELEASE_NOTES.md ---"
+          cat RELEASE_NOTES.md
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.md
+          files: |
+            artifacts/mirrorcam-linux-x86_64/mirrorcam
+            artifacts/mirrorcam-${{ github.ref_name }}-x86_64.flatpak/mirrorcam.flatpak
+
+      # Run after the release exists; a separate `on: release` workflow would
+      # not be triggered by the GITHUB_TOKEN-created release above.
+      - name: Notify FlatPark
+        continue-on-error: true
+        uses: flatpark/publish-action@b67fca1b80b095541bc011967e0a35292bed14d8 # v1
+        with:
+          app-id: io.github.grigio.mirrorcam
+          tag: ${{ github.ref_name }}

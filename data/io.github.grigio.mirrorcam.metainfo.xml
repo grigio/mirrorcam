@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.grigio.mirrorcam</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>MirrorCam</name>
+  <summary>A minimal, borderless camera overlay for Linux</summary>
+  <description>
+    <p>
+      MirrorCam is a minimal, borderless camera overlay for Wayland,
+      written in Rust with GTK4, libadwaita and GStreamer. It keeps a
+      live camera preview on screen in a small floating window with
+      auto-hiding panels.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Borderless overlay with rounded corners, raised on click</li>
+      <li>Auto-hiding header bar with all the controls</li>
+      <li>Camera and resolution selectors with hot-plug support</li>
+      <li>Mirror (selfie flip) toggle</li>
+      <li>Drag to move, drag the edges to resize</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">io.github.grigio.mirrorcam.desktop</launchable>
+  <provides>
+    <binary>mirrorcam</binary>
+  </provides>
+  <url type="homepage">https://github.com/grigio/mirrorcam</url>
+  <url type="bugtracker">https://github.com/grigio/mirrorcam/issues</url>
+  <developer id="io.github.grigio">
+    <name>MirrorCam Contributors</name>
+  </developer>
+  <content_rating type="oars-1.1" />
+  <releases>
+    <release version="0.1.0" date="2026-10-06">
+      <description>
+        <p>Initial release: borderless camera overlay with auto-hiding
+        panels, camera/resolution selectors and a mirror toggle.</p>
+      </description>
+    </release>
+  </releases>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+</component>

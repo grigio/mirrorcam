@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 description = "Minimal borderless camera overlay with autohide panels (GTK4 + libadwaita)"
 license = "MIT"
+repository = "https://github.com/grigio/mirrorcam"
+readme = "README.md"
+keywords = ["camera", "webcam", "overlay", "gtk", "gnome"]
+categories = ["gui", "multimedia"]
 
 [dependencies]
 gtk4 = { version = "0.11", features = ["v4_10"] }
@@ -13,3 +17,10 @@ glib = "0.22"
 
 [profile.dev]
 debug = 1
+
+[profile.release]
+lto = true
+strip = true
+panic = "abort"
+codegen-units = 1
+opt-level = 3

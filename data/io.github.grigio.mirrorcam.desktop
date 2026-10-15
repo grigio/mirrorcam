@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=MirrorCam
+Comment=Minimal borderless camera overlay with auto-hiding panels
+Exec=mirrorcam
+Icon=io.github.grigio.mirrorcam
+Terminal=false
+Type=Application
+Categories=AudioVideo;Video;GTK;
+Keywords=camera;webcam;mirror;overlay;selfie;video;
+StartupWMClass=io.github.grigio.mirrorcam
+StartupNotify=true

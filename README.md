@@ -1,5 +1,7 @@
 # MirrorCam
 
+[![CI](https://github.com/grigio/mirrorcam/actions/workflows/ci.yml/badge.svg)](https://github.com/grigio/mirrorcam/actions/workflows/ci.yml)
+
 A minimal, borderless camera overlay for Wayland, written in Rust with
 **GTK4 + libadwaita** and **GStreamer**. Inspired by
 [grigio/borderless-camera](https://github.com/grigio/borderless-camera),
@@ -62,11 +64,29 @@ The pipeline now prefers `image/jpeg` and decodes it with `jpegdec`
 JPEG decoder plugin is installed on this machine (`vaapi`/`v4l2codecs` are
 present but expose no JPEG decoder), so software decode is the fast path here.
 
+## Install
+
+Every tagged release ships a **standalone binary** and a **Flatpak bundle**
+on the [Releases page](https://github.com/grigio/mirrorcam/releases):
+
+```sh
+# flatpak bundle (needs the GNOME runtime: flatpak install flathub org.gnome.Platform//50)
+flatpak install --user mirrorcam-*.flatpak
+flatpak run io.github.grigio.mirrorcam
+```
+
 ## Build
 
 ```sh
 # deps: gtk4, libadwaita, gstreamer (base/good/gtk4 plugins)
 cargo build --release
+```
+
+Flatpak, from a checkout (same manifest CI uses):
+
+```sh
+python3 build-aux/gen-cargo-sources.py   # vendored crates from Cargo.lock
+flatpak-builder --user --install --force-clean build-dir io.github.grigio.mirrorcam.yml
 ```
 
 ## Run
@@ -109,5 +129,10 @@ $VW input mousemove -a -x 390 -y 300
 |---|---|
 | `src/main.rs` | UI, panels, autohide, shortcuts, selectors, move/resize |
 | `src/camera.rs` | device discovery, hotplug, format list, GStreamer pipeline |
+| `data/` | `.desktop`, AppStream metainfo, scalable icon |
+| `io.github.grigio.mirrorcam.yml` | Flatpak manifest (GNOME 50 runtime) |
+| `build-aux/gen-cargo-sources.py` | `Cargo.lock` → `cargo-sources.json` (Flatpak vendoring) |
+| `build-aux/bump-version.sh` | bump `Cargo.toml` + metainfo `<release>` in one shot |
+| `.github/workflows/ci.yml` | fmt/clippy/build/test, release binaries + Flatpak on tags |
 
 MIT licensed.
